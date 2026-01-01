@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Daily Reset</title>
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <style>
+    :root { font-family: -apple-system, system-ui, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin:0; background:#0f0f10; color:#f3f3f3; }
+    header { position:sticky; top:0; background:#121214; border-bottom:1px solid #26262a; padding:14px 16px; }
+    h1 { margin:0; font-size:16px; }
+    .sub { opacity:.8; font-size:12px; margin-top:4px; }
+    main { padding:14px 16px 90px; max-width:860px; margin:0 auto; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    select, button, textarea {
+      background:#17171a; color:#f3f3f3; border:1px solid #2a2a30; border-radius:12px;
+      padding:10px 12px; font-size:14px;
+    }
+    button { cursor:pointer; }
+    button.primary { background:#1f5cff; border-color:#1f5cff; }
+    button.ghost { background:transparent; }
+    .card { background:#121214; border:1px solid #26262a; border-radius:16px; padding:12px; margin:12px 0; }
+    .muted { opacity:.8; font-size:12px; }
+    .pill { display:inline-block; padding:6px 10px; border:1px solid #2a2a30; border-radius:999px; font-size:12px; }
+    .grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; }
+    @media (max-width:560px){ .grid{ grid-template-columns:1fr; } }
+    textarea { width:100%; min-height:70px; resize:vertical; }
+    .footerbar{
+      position:fixed; left:0; right:0; bottom:0;
+      background:#121214; border-top:1px solid #26262a;
+      padding:10px 12px; display:flex; justify-content:space-between; gap:10px; align-items:center;
+    }
+    .timer { font-variant-numeric: tabular-nums; font-size:18px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>20-Min Reset + ATG + Tendons</h1>
+  <div class="sub">8-week progressive plan • offline PWA • local-only data</div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="row">
+      <span class="pill" id="blockPill">Block: —</span>
+
+      <label class="muted">Week
+        <select id="weekSel"></select>
+      </label>
+
+      <label class="muted">Day
+        <select id="daySel">
+          <option value="Mon">Mon</option><option value="Tue">Tue</option><option value="Wed">Wed</option>
+          <option value="Thu">Thu</option><option value="Fri">Fri</option><option value="Sat">Sat</option><option value="Sun">Sun</option>
+        </select>
+      </label>
+
+      <label class="muted">Readiness
+        <select id="readySel">
+          <option value="green">Green</option>
+          <option value="yellow">Yellow</option>
+          <option value="red">Red</option>
+        </select>
+      </label>
+
+      <button class="primary" id="renderBtn">Show Today</button>
+    </div>
+
+    <div class="muted" style="margin-top:8px;">
+      Rule: nasal breathing. If breathing/posture/quiet control breaks → scale back.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 8px;font-size:14px;">Weekly one-liner check-in</h2>
+    <textarea id="weeklyNote" placeholder="One sentence: what feels safer, smoother, or stronger this week?"></textarea>
+    <div class="row" style="margin-top:10px;">
+      <button id="saveNoteBtn">Save</button>
+      <button class="ghost" id="clearNoteBtn">Clear</button>
+      <span class="muted" id="noteStatus"></span>
+    </div>
+  </div>
+
+  <div class="card" id="planCard">
+    <h2 style="margin:0 0 8px;font-size:14px;">Today’s Plan</h2>
+    <div class="muted">Pick Week + Day and tap “Show Today”.</div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 8px;font-size:14px;">Completion</h2>
+    <div class="row">
+      <button id="markDoneBtn">Mark today done ✅</button>
+      <button class="ghost" id="undoDoneBtn">Undo</button>
+      <span class="muted" id="doneStatus"></span>
+    </div>
+  </div>
+</main>
+
+<div class="footerbar">
+  <div>
+    <div class="muted">Timer</div>
+    <div class="timer" id="timerText">00:00</div>
+  </div>
+  <div class="row">
+    <select id="timerPreset">
+      <option value="30">30s</option>
+      <option value="45">45s</option>
+      <option value="60">60s</option>
+      <option value="90">90s</option>
+    </select>
+    <button id="startBtn" class="primary">Start</button>
+    <button id="stopBtn" class="ghost">Stop</button>
+  </div>
+</div>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    });
+  }
+
+  const KEY = "os_atg_tendon_pwa_v1";
+  const state = JSON.parse(localStorage.getItem(KEY) || "{}");
+  const saveState = () => localStorage.setItem(KEY, JSON.stringify(state));
+
+  const weekSel = document.getElementById("weekSel");
+  for (let i=1;i<=8;i++){
+    const opt = document.createElement("option");
+    opt.value = String(i); opt.textContent = `Week ${i}`;
+    weekSel.appendChild(opt);
+  }
+  const daySel = document.getElementById("daySel");
+  const readySel = document.getElementById("readySel");
+  const blockPill = document.getElementById("blockPill");
+  const planCard = document.getElementById("planCard");
+  const weeklyNote = document.getElementById("weeklyNote");
+  const noteStatus = document.getElementById("noteStatus");
+  const doneStatus = document.getElementById("doneStatus");
+
+  weekSel.value = state.week || "1";
+  daySel.value = state.day || "Mon";
+  readySel.value = state.readiness || "green";
+  weeklyNote.value = (state.weeklyNotes && state.weeklyNotes[weekSel.value]) || "";
+
+  function blockForWeek(w){
+    w = Number(w);
+    if (w<=2) return "Weeks 1–2: Restore & Map";
+    if (w<=4) return "Weeks 3–4: Own the Range";
+    if (w<=6) return "Weeks 5–6: Capacity Confirmation";
+    return "Weeks 7–8: Integration & Expression";
+  }
+
+  function getPlan(week, day, readiness){
+    const w = Number(week);
+    const block = blockForWeek(w);
+
+    const calfHold = (w<=2)?30 : (w<=4)?45 : (w<=6)?60 : 45;
+    const splitIso = (w<=2)?30 : (w<=4)?40 : (w<=6)?60 : 30;
+    const crawlDur = (w<=2)?30 : (w<=4)?60 : (w<=6)?90 : 60;
+
+    const reset = [
+      "RESET (5 min): Supine breathing x5 • Neck nods 10–15 • Rocking 15–20 • Rolling 4–6 • Optional slow crawl",
+    ];
+
+    if (readiness === "red"){
+      return { block, items: [...reset, "RED DAY: Stop here OR add 2–3 min gentle rocking + breathing. Goal: finish calmer than you started."] };
+    }
+
+    const tendonBase = [
+      `TENDONS (5 min): Bent-knee calf iso ${calfHold}s x2 • Tibialis raises 12–15 (or 20–30s iso) • Split squat iso ${splitIso}s/side`
+    ];
+
+    const days = {
+      Mon: [
+        "ATG (7 min): ATG split squat 2x5/side (pause 3–5s) • Deep squat breathing 5–8 breaths",
+        "INTEGRATE (3 min): Wall sit 45–60s"
+      ],
+      Tue: [
+        "HIP/POST (7 min): Slow hinges 8–10 • Glute bridge iso 30–45s • Hip flexor breathing 45–60s/side",
+        "INTEGRATE (3 min): Bear hold 30–45s"
+      ],
+      Wed: [
+        "LATERAL/ROT (7 min): Lateral lunge/Cossack 4–6/side • Side plank 30s/side",
+        "INTEGRATE (3 min): Lateral crawl 30–45s"
+      ],
+      Thu: [
+        "ISO EMPHASIS (10 min): split squat iso • calf iso • tib iso • lunge iso (quiet breathing)",
+        "USE IT (3 min): 45–60s easy crawl + 5 breaths"
+      ],
+      Fri: [
+        "FLOW (10 min): Squat → hinge → crawl → stand transitions (smooth, unforced). Optional partial get-up pattern",
+        "FINISH (3–5 min): Deep squat breathing OR rocking"
+      ],
+      Sat: [
+        "OPTIONAL ATHLETIC (5–8 min): carry or sled or marching. Stop early (expression, not conditioning).",
+        `Crawl dose: ${crawlDur}s total`
+      ],
+      Sun: [
+        "RESTORE (15–20 min): Longer breathing • rolling • rocking • very easy crawling. Downshift."
+      ],
+    };
+
+    let strengthSignal = "";
+    if (w>=5 && w<=6 && day==="Mon"){
+      strengthSignal = "STRENGTH SIGNAL (weekly): add ONE controlled effort set — Wall sit 60s OR split squat iso 60s. Not to failure.";
+    }
+
+    const yellowNote = (readiness==="yellow")
+      ? "YELLOW DAY: cut volume ~50%, keep holds shorter, keep everything quiet."
+      : "";
+
+    const items = [
+      ...reset,
+      ...tendonBase,
+      ...days[day],
+      `Crawl (dose): ${crawlDur}s total somewhere in the session.`,
+      strengthSignal,
+      yellowNote
+    ].filter(Boolean);
+
+    return { block, items };
+  }
+
+  function render(){
+    const week = weekSel.value;
+    const day = daySel.value;
+    const readiness = readySel.value;
+
+    state.week = week; state.day = day; state.readiness = readiness;
+    saveState();
+
+    const { block, items } = getPlan(week, day, readiness);
+    blockPill.textContent = `Block: ${block}`;
+
+    const id = `${week}-${day}`;
+    const done = state.done && state.done[id];
+
+    planCard.innerHTML = `
+      <h2 style="margin:0 0 8px;font-size:14px;">Today’s Plan (${day}, Week ${week})</h2>
+      <div class="muted" style="margin-bottom:10px;">Readiness: ${readiness.toUpperCase()} • ${done ? "✅ Done" : "Not done yet"}</div>
+      <div class="grid">
+        ${items.map(t => `<div class="card" style="margin:0;">${t}</div>`).join("")}
+      </div>
+    `;
+
+    weeklyNote.value = (state.weeklyNotes && state.weeklyNotes[week]) || "";
+    doneStatus.textContent = done ? `Marked done for ${day} (Week ${week}).` : "";
+  }
+
+  document.getElementById("renderBtn").addEventListener("click", render);
+  weekSel.addEventListener("change", render);
+  daySel.addEventListener("change", render);
+  readySel.addEventListener("change", render);
+
+  document.getElementById("saveNoteBtn").addEventListener("click", () => {
+    const w = weekSel.value;
+    state.weeklyNotes = state.weeklyNotes || {};
+    state.weeklyNotes[w] = weeklyNote.value.trim();
+    saveState();
+    noteStatus.textContent = `Saved for Week ${w}.`;
+    setTimeout(()=>noteStatus.textContent="", 1200);
+  });
+
+  document.getElementById("clearNoteBtn").addEventListener("click", () => { weeklyNote.value = ""; });
+
+  document.getElementById("markDoneBtn").addEventListener("click", () => {
+    const id = `${weekSel.value}-${daySel.value}`;
+    state.done = state.done || {};
+    state.done[id] = true;
+    saveState();
+    render();
+  });
+
+  document.getElementById("undoDoneBtn").addEventListener("click", () => {
+    const id = `${weekSel.value}-${daySel.value}`;
+    if (state.done) delete state.done[id];
+    saveState();
+    render();
+  });
+
+  let timer = null, remaining = 0;
+  const timerText = document.getElementById("timerText");
+  const fmt = (s)=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+
+  function tick(){
+    remaining--;
+    timerText.textContent = fmt(remaining);
+    if (remaining <= 0){
+      clearInterval(timer); timer=null;
+      try { navigator.vibrate && navigator.vibrate([150,80,150]); } catch(e){}
+      alert("Done.");
+    }
+  }
+
+  document.getElementById("startBtn").addEventListener("click", () => {
+    const preset = Number(document.getElementById("timerPreset").value);
+    if (timer) clearInterval(timer);
+    remaining = preset;
+    timerText.textContent = fmt(remaining);
+    timer = setInterval(tick, 1000);
+  });
+
+  document.getElementById("stopBtn").addEventListener("click", () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+  });
+
+  render();
+</script>
+</body>
+</html>
