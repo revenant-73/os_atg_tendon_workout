@@ -119,6 +119,29 @@
       transform: translateY(-50%); pointer-events: none; color: var(--muted);
     }
     select { width: 100%; padding-right: 32px; }
+    .exercise-card {
+      background: #252528;
+      border-radius: 12px;
+      padding: 14px;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-left: 4px solid var(--accent);
+    }
+    .exercise-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+    .exercise-target { font-size: 1.1rem; font-weight: 800; color: var(--accent); }
+    .exercise-note { font-size: 0.75rem; color: var(--muted); line-height: 1.3; }
+
+    .phase-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-top: 8px;
+      margin-bottom: 4px;
+      grid-column: 1 / -1;
+    }
   </style>
 </head>
 <body>
@@ -262,64 +285,70 @@
     const crawlDur = (w<=2)?30 : (w<=4)?60 : (w<=6)?90 : 60;
 
     const reset = [
-      "RESET (5 min): Supine breathing x5 • Neck nods 10–15 • Rocking 15–20 • Rolling 4–6 • Optional slow crawl",
+      { phase: "Reset", title: "Supine Breathing", target: "5 breaths" },
+      { phase: "Reset", title: "Neck Nods", target: "10–15 reps" },
+      { phase: "Reset", title: "Rocking", target: "15–20 reps" },
+      { phase: "Reset", title: "Rolling", target: "4–6 reps" },
     ];
 
     if (readiness === "red"){
-      return { block, items: [...reset, "RED DAY: Stop here OR add 2–3 min gentle rocking + breathing. Goal: finish calmer than you started."] };
+      return { block, items: [...reset, { phase: "Note", title: "RED DAY", target: "Stop or Gentle Rocking", note: "Goal: finish calmer than you started." }] };
     }
 
-    const tendonBase = [
-      `TENDONS (5 min): Bent-knee calf iso ${calfHold}s x2 • Tibialis raises 12–15 (or 20–30s iso) • Split squat iso ${splitIso}s/side`
+    const tendons = [
+      { phase: "Tendons", title: "Bent-Knee Calf ISO", target: `${calfHold}s x 2`, note: "Focus on tension" },
+      { phase: "Tendons", title: "Tibialis Raises", target: "12–15 reps", note: "Or 20-30s ISO" },
+      { phase: "Tendons", title: "Split Squat ISO", target: `${splitIso}s /side`, note: "Stay upright" },
     ];
 
     const days = {
       Mon: [
-        "ATG (7 min): ATG split squat 2x5/side (pause 3–5s) • Deep squat breathing 5–8 breaths",
-        "INTEGRATE (3 min): Wall sit 45–60s"
+        { phase: "ATG", title: "ATG Split Squat", target: "2 x 5 /side", note: "Pause 3–5s at bottom" },
+        { phase: "ATG", title: "Deep Squat Breathing", target: "5–8 breaths" },
+        { phase: "Integrate", title: "Wall Sit", target: "45–60s" }
       ],
       Tue: [
-        "HIP/POST (7 min): Slow hinges 8–10 • Glute bridge iso 30–45s • Hip flexor breathing 45–60s/side",
-        "INTEGRATE (3 min): Bear hold 30–45s"
+        { phase: "Hip/Post", title: "Slow Hinges", target: "8–10 reps" },
+        { phase: "Hip/Post", title: "Glute Bridge ISO", target: "30–45s" },
+        { phase: "Hip/Post", title: "Hip Flexor Breathing", target: "45–60s /side" },
+        { phase: "Integrate", title: "Bear Hold", target: "30–45s" }
       ],
       Wed: [
-        "LATERAL/ROT (7 min): Lateral lunge/Cossack 4–6/side • Side plank 30s/side",
-        "INTEGRATE (3 min): Lateral crawl 30–45s"
+        { phase: "Lateral", title: "Lateral Lunge / Cossack", target: "4–6 /side" },
+        { phase: "Lateral", title: "Side Plank", target: "30s /side" },
+        { phase: "Integrate", title: "Lateral Crawl", target: "30–45s" }
       ],
       Thu: [
-        "ISO EMPHASIS (10 min): split squat iso • calf iso • tib iso • lunge iso (quiet breathing)",
-        "USE IT (3 min): 45–60s easy crawl + 5 breaths"
+        { phase: "ISO Emphasis", title: "Split Squat ISO", target: "Quiet breathing" },
+        { phase: "ISO Emphasis", title: "Calf ISO", target: "Solid tension" },
+        { phase: "ISO Emphasis", title: "Tibialis ISO", target: "Hold strong" },
+        { phase: "Integrate", title: "Easy Crawl", target: "45–60s + 5 breaths" }
       ],
       Fri: [
-        "FLOW (10 min): Squat → hinge → crawl → stand transitions (smooth, unforced). Optional partial get-up pattern",
-        "FINISH (3–5 min): Deep squat breathing OR rocking"
+        { phase: "Flow", title: "Transitions", target: "10 mins", note: "Squat → hinge → crawl → stand (smooth)" },
+        { phase: "Flow", title: "Partial Get-up", target: "Optional pattern" },
+        { phase: "Finish", title: "Deep Squat Breathing", target: "3–5 min", note: "Or rocking" }
       ],
       Sat: [
-        "OPTIONAL ATHLETIC (5–8 min): carry or sled or marching. Stop early (expression, not conditioning).",
-        `Crawl dose: ${crawlDur}s total`
+        { phase: "Athletic", title: "Carry / Sled / March", target: "5–8 min", note: "Expression, not conditioning" },
+        { phase: "Athletic", title: "Crawl Dose", target: `${crawlDur}s total` }
       ],
       Sun: [
-        "RESTORE (15–20 min): Longer breathing • rolling • rocking • very easy crawling. Downshift."
+        { phase: "Restore", title: "Full Routine", target: "15–20 min", note: "Breathing, rolling, rocking, easy crawling. Downshift." }
       ],
     };
 
-    let strengthSignal = "";
+    const items = [...reset, ...tendons, ...days[day]];
+
     if (w>=5 && w<=6 && day==="Mon"){
-      strengthSignal = "STRENGTH SIGNAL (weekly): add ONE controlled effort set — Wall sit 60s OR split squat iso 60s. Not to failure.";
+      items.push({ phase: "Signal", title: "STRENGTH SIGNAL", target: "60s ISO", note: "Wall sit OR Split Squat. Not to failure." });
     }
 
-    const yellowNote = (readiness==="yellow")
-      ? "YELLOW DAY: cut volume ~50%, keep holds shorter, keep everything quiet."
-      : "";
+    items.push({ phase: "Crawl", title: "Total Crawl Dose", target: `${crawlDur}s`, note: "Somewhere in the session" });
 
-    const items = [
-      ...reset,
-      ...tendonBase,
-      ...days[day],
-      `Crawl (dose): ${crawlDur}s total somewhere in the session.`,
-      strengthSignal,
-      yellowNote
-    ].filter(Boolean);
+    if (readiness === "yellow") {
+      items.push({ phase: "Note", title: "YELLOW DAY", target: "Cut volume 50%", note: "Keep holds shorter, keep everything quiet." });
+    }
 
     return { block, items };
   }
@@ -338,14 +367,31 @@
     const id = `${week}-${day}`;
     const done = state.done && state.done[id];
 
+    let lastPhase = "";
+    const htmlItems = items.map(item => {
+      let phaseHtml = "";
+      if (item.phase !== lastPhase) {
+        phaseHtml = `<div class="phase-label">${item.phase}</div>`;
+        lastPhase = item.phase;
+      }
+      return `
+        ${phaseHtml}
+        <div class="exercise-card">
+          <div class="exercise-title">${item.title}</div>
+          <div class="exercise-target">${item.target}</div>
+          ${item.note ? `<div class="exercise-note">${item.note}</div>` : ""}
+        </div>
+      `;
+    }).join("");
+
     planCard.innerHTML = `
       <div class="card">
         <h2 style="margin:0 0 4px;font-size:1rem; font-weight:700;">Today’s Plan</h2>
         <div class="muted" style="margin-bottom:16px;">${day}, Week ${week} • Readiness: ${readiness.toUpperCase()}</div>
         <div class="grid">
-          ${items.map(t => `<div class="card" style="margin:0; background: #252528; border-color: transparent; font-size: 0.95rem;">${t}</div>`).join("")}
+          ${htmlItems}
         </div>
-        ${done ? `<div style="margin-top:16px; text-align:center; color:#22c55e; font-weight:600;">✅ COMPLETED</div>` : ""}
+        ${done ? `<div style="margin-top:24px; text-align:center; color:#22c55e; font-weight:600; background: rgba(34, 197, 94, 0.1); padding: 12px; border-radius: 10px;">✅ SESSION COMPLETE</div>` : ""}
       </div>
     `;
 
